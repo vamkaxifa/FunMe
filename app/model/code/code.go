@@ -3,11 +3,11 @@ package code
 import (
 	"FunMe/app/model/utils"
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
-	"encoding/json"
 	"strings"
 )
 
@@ -18,12 +18,17 @@ type StatisticsResult struct {
 }
 
 /**
+统计结果chan
+*/
+var statisticsResultChan chan StatisticsResult
+
+/**
 Statistics Number of comment lines
 */
-func StatisticsCommentLine(path string) *StatisticsResult {
-	if  utils.CheckFileIsExist(path) == false{
+func StatisticsCommentLine(path string) {
+	if utils.CheckFileIsExist(path) == false {
 		fmt.Println("path doesn't exist!")
-		return &StatisticsResult{TotalNum: 0, CodeNum: 0, CommentNum: 0} //不存在的文件统一返回0
+		statisticsResultChan <- StatisticsResult{TotalNum: 0, CodeNum: 0, CommentNum: 0}
 	}
 
 	f, err := os.Open(path)
@@ -31,7 +36,7 @@ func StatisticsCommentLine(path string) *StatisticsResult {
 	if err != nil {
 		fmt.Println(err)
 		debug.PrintStack()
-		return &StatisticsResult{TotalNum: 0, CodeNum: 0, CommentNum: 0}
+		statisticsResultChan <- StatisticsResult{TotalNum: 0, CodeNum: 0, CommentNum: 0}
 	}
 	rd := bufio.NewReader(f)
 	rs := StatisticsResult{TotalNum: 0, CodeNum: 0, CommentNum: 0}
@@ -49,7 +54,7 @@ func StatisticsCommentLine(path string) *StatisticsResult {
 
 		line = strings.Trim(line, " ") //去掉首尾空格
 
-		if len(line) == 0 || line == "\n" || line =="\r" { //空行不统计
+		if len(line) == 0 || line == "\n" || line == "\r" { //空行不统计
 			continue
 		}
 
@@ -79,6 +84,37 @@ func StatisticsCommentLine(path string) *StatisticsResult {
 		rs.CodeNum += 1
 	}
 	jsonbyte, err := json.Marshal(rs)
-    fmt.Println(string(jsonbyte))
-	return &rs
+	fmt.Println(string(jsonbyte))
+	statisticsResultChan <- rs
+}
+
+/*
+统计给定文件夹下指定文件类型里代码行数、注释行数
+*/
+func Statistics(path string, suffixAry []string) (*StatisticsResult, error) {
+	var fiAry []string
+	if utils.IsDir(path) {
+		ary, err := utils.WalkDir(path, suffixAry)
+		if err != nil {
+			return nil, err
+		}
+		fiAry = ary
+	} else {
+		fiAry = []string{path}
+	}
+	fmt.Println(len(fiAry))
+	statisticsResultChan = make(chan StatisticsResult, len(fiAry)) //FIXME length of cache doesn't need that too much
+	for _, fi := range fiAry {
+		go StatisticsCommentLine(fi)
+	}
+	statisticsResult := StatisticsResult{}
+
+	for i := 0; i < len(fiAry); i++ {
+		sr := <-statisticsResultChan
+		statisticsResult.TotalNum += sr.TotalNum
+		statisticsResult.CodeNum += sr.CodeNum
+		statisticsResult.CommentNum += sr.CommentNum
+	}
+
+	return &statisticsResult, nil
 }

@@ -10,7 +10,11 @@ type App struct {
 	*revel.Controller
 }
 
-
+type CommonResponse struct {
+	Code 	int64 `json:"code"`
+	Data    code.StatisticsResult `json:"data"`
+	ErrorDes string		`json:"error_des"`
+}
 
 /**
 index page
@@ -32,10 +36,14 @@ Statistics Number of comment lines
  */
 
 func (c App) Code() revel.Result{
-	path := "/Users/vivian/Documents/workfile/gopath/src/FunMe/app/controllers/app.go"
+	path := "/Users/vivian/Documents/workfile/gopath/src/FunMe"
 	fmt.Println(path)
-	res := code.StatisticsCommentLine(path)
-	return c.RenderJSON(res)
+	suffixAry := []string{"go","java","py"}
+	res,err := code.Statistics(path,suffixAry)
+	if err!=nil{
+		return c.RenderJSON(CommonResponse{Code:1,ErrorDes:err.Error()})
+	}
+	return c.RenderJSON(CommonResponse{Code:0,Data:*res})
 }
 
 

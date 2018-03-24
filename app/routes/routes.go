@@ -22,6 +22,13 @@ func (_ tApp) Healthcheck(
 	return revel.MainRouter.Reverse("App.Healthcheck", args).URL
 }
 
+func (_ tApp) Code(
+		) string {
+	args := make(map[string]string)
+	
+	return revel.MainRouter.Reverse("App.Code", args).URL
+}
+
 
 type tStatic struct {}
 var Static tStatic
